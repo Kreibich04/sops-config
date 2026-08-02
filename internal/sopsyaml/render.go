@@ -3,6 +3,7 @@ package sopsyaml
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/Kreibich04/sops-config/internal/merge"
@@ -43,11 +44,36 @@ func Render(rules []merge.ResolvedRule) ([]byte, error) {
 	return out, nil
 }
 
-// WriteFile renders the rules and writes them to path.
+// WriteFile renders the rules and writes them to path atomically: it writes
+// to a temp file in the same directory, syncs it, then renames it over
+// path, so a crash or interrupted write can never leave a truncated or
+// half-written .sops.yaml behind.
 func WriteFile(path string, rules []merge.ResolvedRule) error {
 	data, err := Render(rules)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+
+	tmp, err := os.CreateTemp(filepath.Dir(path), ".sops.yaml.tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	defer os.Remove(tmpPath) // no-op once the rename below succeeds
+
+	if _, err := tmp.Write(data); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		tmp.Close()
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmpPath, 0o644); err != nil {
+		return err
+	}
+	return os.Rename(tmpPath, path)
 }

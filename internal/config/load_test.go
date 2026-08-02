@@ -22,7 +22,7 @@ users:
   - name: "Admin"
     groups: [admin]
     keys:
-      pgp: ["AABB"]
+      pgp: ["AABB11223344"]
 rules:
   - path_regex: secrets/.*
     encrypted_regex: '^(data)$'
@@ -45,6 +45,76 @@ func TestLoadFileMalformedYAML(t *testing.T) {
 	path := writeTemp(t, "users: [\n  - name: broken\n")
 	if _, err := LoadFile(path); err == nil {
 		t.Fatal("expected error for malformed YAML")
+	}
+}
+
+func TestLoadFileUnknownFieldIsError(t *testing.T) {
+	path := writeTemp(t, `
+users:
+  - name: "Admin"
+    comnent: "typo of comment"
+    keys:
+      pgp: ["AABB11223344"]
+`)
+	if _, err := LoadFile(path); err == nil {
+		t.Fatal("expected error for unknown field")
+	}
+}
+
+func TestLoadFileRejectsInvalidUsersAndRules(t *testing.T) {
+	cases := map[string]string{
+		"empty group name": `
+users:
+  - name: A
+    groups: [""]
+    keys:
+      pgp: ["AABB11223344"]
+`,
+		"duplicate group": `
+users:
+  - name: A
+    groups: [admin, admin]
+    keys:
+      pgp: ["AABB11223344"]
+`,
+		"user with no keys": `
+users:
+  - name: A
+    groups: [admin]
+`,
+		"malformed pgp key": `
+users:
+  - name: A
+    keys:
+      pgp: ["not-hex"]
+`,
+		"malformed age key": `
+users:
+  - name: A
+    keys:
+      age: ["not-an-age-key"]
+`,
+		"duplicate key": `
+users:
+  - name: A
+    keys:
+      pgp: ["AABB11223344", "AABB11223344"]
+`,
+		"rule with no groups": `
+rules:
+  - path_regex: .*
+    encrypted_regex: '^(data)$'
+    priority: 1
+    groups: []
+`,
+	}
+	for name, contents := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := writeTemp(t, contents)
+			if _, err := LoadFile(path); err == nil {
+				t.Fatal("expected error")
+			}
+		})
 	}
 }
 

@@ -36,7 +36,7 @@ users:
   - name: Admin
     groups: [admin]
     keys:
-      pgp: [AABB11]
+      pgp: [AABB11223344]
 rules:
   - path_regex: .*/muc/secrets/.*
     encrypted_regex: '^(data|stringData)$'
@@ -53,7 +53,7 @@ rules:
 	if readErr != nil {
 		t.Fatalf("expected .sops.yaml to be written: %v", readErr)
 	}
-	if !strings.Contains(string(out), "pgp: AABB11") {
+	if !strings.Contains(string(out), "pgp: AABB11223344") {
 		t.Fatalf(".sops.yaml missing expected content:\n%s", out)
 	}
 }
@@ -105,7 +105,7 @@ users:
   - name: MucAdmin
     groups: [muc-admin]
     keys:
-      age: [age1muc]
+      age: [age1mucmucmucmucmucmucmuc]
 `)
 	writeFile(t, filepath.Join(root, "muc", "sops-config.yaml"), `
 rules:
@@ -121,7 +121,7 @@ rules:
 	}
 
 	out, _ := os.ReadFile(filepath.Join(root, ".sops.yaml"))
-	if !strings.Contains(string(out), "^muc/secrets/.*") {
+	if !strings.Contains(string(out), "^muc/.*secrets/.*") {
 		t.Fatalf("expected scoped path_regex, got:\n%s", out)
 	}
 }
