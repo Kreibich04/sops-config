@@ -176,3 +176,22 @@ func TestBuildRulesDedupeAndSortKeys(t *testing.T) {
 		t.Fatalf("got %v, want %v", rules[0].PGP, want)
 	}
 }
+
+func TestBuildRulesWholeFileEncryptedRegexOptional(t *testing.T) {
+	root := disc(".", true, &config.Config{
+		Users: []config.User{
+			{Name: "A", Groups: []string{"g"}, Keys: config.Keys{PGP: []string{"AABB"}}},
+		},
+		Rules: []config.Rule{
+			{PathRegex: "^secrets/.*", Priority: intp(1), Groups: []string{"g"}},
+		},
+	})
+	reg, _ := MergeUsers([]config.Discovered{root})
+	rules, diags := BuildRules(reg, []config.Discovered{root})
+	if HasErrors(diags) {
+		t.Fatalf("unexpected errors: %v", diags)
+	}
+	if got := rules[0].EncryptedRegex; got != "" {
+		t.Fatalf("EncryptedRegex = %q, want empty (whole-file encryption)", got)
+	}
+}

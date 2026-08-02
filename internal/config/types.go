@@ -24,8 +24,10 @@ type Keys struct {
 // Rule describes one SOPS creation_rule to generate, in terms of the groups
 // that should be able to decrypt matching paths.
 type Rule struct {
-	PathRegex      string `yaml:"path_regex"`
-	EncryptedRegex string `yaml:"encrypted_regex"`
+	PathRegex string `yaml:"path_regex"`
+	// EncryptedRegex is optional; omitting it encrypts the entire file, same
+	// as omitting it from a vanilla SOPS creation_rule.
+	EncryptedRegex string `yaml:"encrypted_regex,omitempty"`
 	Comment        string `yaml:"comment,omitempty"`
 	// Priority is a pointer so a missing value can be distinguished from an
 	// explicit priority of 0.

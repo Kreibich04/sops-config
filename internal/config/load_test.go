@@ -118,6 +118,22 @@ rules:
 	}
 }
 
+func TestLoadFileOptionalEncryptedRegex(t *testing.T) {
+	path := writeTemp(t, `
+rules:
+  - path_regex: .*
+    priority: 1
+    groups: [admin]
+`)
+	cfg, err := LoadFile(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := cfg.Rules[0].EncryptedRegex; got != "" {
+		t.Fatalf("EncryptedRegex = %q, want empty (whole-file encryption)", got)
+	}
+}
+
 func TestLoadFileMissingFields(t *testing.T) {
 	cases := map[string]string{
 		"missing user name": `
@@ -127,11 +143,6 @@ users:
 		"missing path_regex": `
 rules:
   - encrypted_regex: '^(data)$'
-    priority: 1
-`,
-		"missing encrypted_regex": `
-rules:
-  - path_regex: .*
     priority: 1
 `,
 		"missing priority": `
