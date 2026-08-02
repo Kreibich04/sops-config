@@ -27,7 +27,8 @@ Download a prebuilt binary from the
 grab the archive matching your OS/arch (e.g.
 `sops-config_vX.Y.Z_linux_amd64.tar.gz`, `..._darwin_arm64.tar.gz`,
 `..._windows_amd64.zip`), extract it, and put the `sops-config` binary on
-your `PATH`.
+your `PATH`. Each release also includes a `checksums.txt` to verify the
+download.
 
 ```sh
 # example: Linux amd64
@@ -37,14 +38,31 @@ tar -xzf sops-config.tar.gz
 sudo mv sops-config /usr/local/bin/
 ```
 
+Or, with a Go toolchain installed:
+
+```sh
+go install github.com/Kreibich04/sops-config/cmd/sops-config@latest
+```
+
 ### Build from source (development)
 
-Only needed if no release covers your platform, or you're working on
-`sops-config` itself / need an unreleased change:
+Only needed if you're working on `sops-config` itself / need an unreleased
+change:
 
 ```sh
 go build -o sops-config ./cmd/sops-config
 ```
+
+### Shell completion
+
+`sops-config` uses [cobra](https://github.com/spf13/cobra), which provides
+completion for bash, zsh, fish, and PowerShell out of the box:
+
+```sh
+sops-config completion bash > /etc/bash_completion.d/sops-config   # or zsh/fish/powershell
+```
+
+Run `sops-config completion --help` for shell-specific setup instructions.
 
 ### Write a `sops-config.yaml`
 
