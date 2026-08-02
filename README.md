@@ -20,7 +20,27 @@ root, in the format SOPS expects.
 
 ## Usage
 
-### Install / build
+### Install
+
+Download a prebuilt binary from the
+[latest release](https://github.com/Kreibich04/sops-config/releases/latest):
+grab the archive matching your OS/arch (e.g.
+`sops-config_vX.Y.Z_linux_amd64.tar.gz`, `..._darwin_arm64.tar.gz`,
+`..._windows_amd64.zip`), extract it, and put the `sops-config` binary on
+your `PATH`.
+
+```sh
+# example: Linux amd64
+curl -L -o sops-config.tar.gz \
+  https://github.com/Kreibich04/sops-config/releases/latest/download/sops-config_vX.Y.Z_linux_amd64.tar.gz
+tar -xzf sops-config.tar.gz
+sudo mv sops-config /usr/local/bin/
+```
+
+### Build from source (development)
+
+Only needed if no release covers your platform, or you're working on
+`sops-config` itself / need an unreleased change:
 
 ```sh
 go build -o sops-config ./cmd/sops-config
