@@ -100,12 +100,20 @@ to cut a release:
   push authenticated with the default `GITHUB_TOKEN` cannot trigger other
   workflows, which is why a PAT is required here).
 - That tag push is *supposed* to trigger `release.yml` (cross-compile +
-  publish binaries), but this has been unreliable in practice — both
-  `v0.0.1` and `v0.0.2` tag pushes via `RELEASE_TOKEN` completed
-  successfully without ever triggering `release.yml` (confirmed via
-  `gh run list --workflow=release.yml` showing zero runs). Root cause is
-  unconfirmed; likely `RELEASE_TOKEN`'s scopes/repo access. If a release
-  goes out without binaries, don't assume automation will catch up —
+  publish binaries). For `v0.0.1` and `v0.0.2` it never did (confirmed via
+  `gh run list --workflow=release.yml` showing zero push-triggered runs).
+  Root cause (confirmed from the `tag-release.yml` run log): `actions/checkout`
+  defaults to `persist-credentials: true`, which leaves a
+  `http.https://github.com/.extraheader` Basic-auth override for the
+  default `GITHUB_TOKEN` in the job's local git config. The later
+  `git push` step embeds `RELEASE_TOKEN` directly in the URL instead, but
+  git/curl still prefers the custom `Authorization` header from that
+  extraheader over URL-embedded credentials, so the push actually goes out
+  authenticated as `GITHUB_TOKEN` — and pushes made with the default
+  `GITHUB_TOKEN` never trigger other workflows, by GitHub Actions design.
+  Fixed by adding `persist-credentials: false` to the checkout step in
+  `tag-release.yml` so it never leaves that override behind. If a release
+  still goes out without binaries, don't assume automation will catch up —
   check `gh run list --workflow=release.yml`, and if empty, dispatch it
   manually: `gh workflow run release.yml --ref vX.Y.Z` (works because
   `release.yml` has a `workflow_dispatch` trigger as of `v0.0.2`; tags cut
