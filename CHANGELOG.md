@@ -1,3 +1,10 @@
+## [0.0.2] - 2026-08-02
+
+### Bug Fixes
+
+- Release workflow can now be manually re-run via `workflow_dispatch`, so a release can be rebuilt if the tag push doesn't trigger it automatically.
+
+
 ## [0.0.1] - 2026-08-02
 
 ### Features
