@@ -1,6 +1,8 @@
 package sopsyaml
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/Kreibich04/sops-config/internal/merge"
@@ -41,5 +43,30 @@ creation_rules:
 `
 	if string(got) != want {
 		t.Fatalf("output mismatch:\ngot:\n%s\nwant:\n%s", got, want)
+	}
+}
+
+func TestWriteFileNoLeftoverTempFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".sops.yaml")
+
+	if err := WriteFile(path, []merge.ResolvedRule{{PathRegex: "^a/.*", EncryptedRegex: "^data$", PGP: []string{"AABB"}}}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0].Name() != ".sops.yaml" {
+		t.Fatalf("expected only .sops.yaml in dir, got %v", entries)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o644 {
+		t.Fatalf("expected mode 0644, got %v", info.Mode().Perm())
 	}
 }

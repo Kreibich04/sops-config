@@ -1,0 +1,1 @@
+`sops-config.yaml` is now decoded with strict (unknown-field-rejecting) YAML parsing, and validation now also rejects empty/duplicate group names, users with no `pgp`/`age` keys, rules with no `groups`, duplicate keys within a user, and `pgp`/`age` key values that don't look like real keys.

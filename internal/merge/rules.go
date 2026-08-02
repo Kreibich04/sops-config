@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"sort"
+	"strings"
 
 	"github.com/Kreibich04/sops-config/internal/config"
 )
@@ -34,6 +35,17 @@ func BuildRules(reg *UserRegistry, discovered []config.Discovered) ([]ResolvedRu
 		for i, r := range d.Config.Rules {
 			label := fmt.Sprintf("rules[%d]", i)
 
+			if !strings.HasPrefix(r.PathRegex, "^") {
+				where := "over the whole repo"
+				if d.Dir != "." {
+					where = "anywhere under " + d.Dir + "/, not just directly inside it"
+				}
+				diags = append(diags, Diagnostic{Warning, source, fmt.Sprintf(
+					"%s: path_regex %q is unanchored; it's matched as a substring search %s (consider a leading \"^\" to anchor it)",
+					label, r.PathRegex, where,
+				)})
+			}
+
 			scoped := ScopePathRegex(d.Dir, r.PathRegex)
 			if _, err := regexp.Compile(scoped); err != nil {
 				diags = append(diags, Diagnostic{Error, source, fmt.Sprintf("%s: invalid path_regex %q: %v", label, scoped, err)})
@@ -48,7 +60,7 @@ func BuildRules(reg *UserRegistry, discovered []config.Discovered) ([]ResolvedRu
 			ageSet := map[string]struct{}{}
 			badRule := false
 			for _, g := range r.Groups {
-				users := reg.UsersInGroup(g)
+				users := reg.UsersInGroup(g, d.Dir)
 				if len(users) == 0 {
 					diags = append(diags, Diagnostic{Error, source, fmt.Sprintf("%s: group %q has no matching users", label, g)})
 					badRule = true

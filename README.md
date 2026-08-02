@@ -55,8 +55,16 @@ rules:
 
 Any subdirectory may contain its own `sops-config.yaml` to add more users
 and/or rules. A subdirectory rule's `path_regex` is relative to that
-subdirectory — see [Path scoping](#path-scoping) below for how it's combined
-with the parent tree.
+subdirectory, and matches the same way it would if you'd written it as a
+root pattern scoped to just that subtree — see [Path scoping](#path-scoping)
+below for exactly how it's combined with the directory prefix, and what a
+leading `^` changes.
+
+Users declared at the root are visible to every rule in the tree. Users
+declared in a subdirectory are visible only to rules in that subdirectory
+and its descendants — a subdirectory's `sops-config.yaml` can never change
+who a rule outside its own subtree resolves to (see
+[User visibility](#user-visibility) below).
 
 ### Generate `.sops.yaml`
 
@@ -73,7 +81,9 @@ writes `<root>/.sops.yaml`. Flags:
 
 If any error-level diagnostic is found, `generate` prints it and exits
 non-zero **without writing** — it never produces a partial or wrong
-`.sops.yaml`.
+`.sops.yaml`. The write itself is atomic (write to a temp file in the same
+directory, then rename over the target), so an interrupted `generate` can
+never leave a truncated `.sops.yaml` behind either.
 
 ### Validate without writing
 
@@ -109,46 +119,77 @@ pipeline, so they can never drift in what they check.
 1. **Discovery** (`internal/config.Discover`): walks `--root`, finds every
    file named `sops-config.yaml`, in lexical order (root's own config
    first, then subdirectories in walk order). Errors if no config exists at
-   the root. Malformed YAML or a missing required field (`name`,
-   `path_regex`, `encrypted_regex`, `priority`) aborts discovery
+   the root. YAML is decoded with `KnownFields(true)`, so an unrecognized
+   field (e.g. a typo'd `comnent:`) is rejected rather than silently
+   ignored. Malformed YAML, an unknown field, or a missing/invalid field
+   (see [Validation rules](#validation-rules)) aborts discovery
    immediately, reporting just that one file — fix it and rerun to see
    what's next. This stage is deliberately fail-fast: a config file that
    doesn't even parse can't be reasoned about well enough to keep walking
    past it.
 2. **User merge** (`internal/merge.MergeUsers`): users from every discovered
-   config are combined into one global registry, keyed by `name`. A name
-   redeclared with identical groups/keys is a silent no-op (lets a shared
-   user be conveniently repeated). A name redeclared with *differing*
-   groups or keys is an error — key-material conflicts are never resolved
-   by silently picking one side. Group membership is registered globally,
-   so a rule in any config file can reference a group defined in any other.
-3. **Path scoping** (`internal/merge.ScopePathRegex`): a root-level rule's
-   `path_regex` is used unmodified. A subdirectory rule's `path_regex` is
-   anchored and prefixed with its directory:
+   config are combined into a registry, keyed by `name`, that also tracks
+   which directory(ies) declared each user. A name redeclared with
+   identical groups/keys is a silent no-op that extends that user's
+   visibility to the redeclaring directory too (lets a shared user be
+   conveniently repeated across directories that need it). A name
+   redeclared with *differing* groups or keys is an error — key-material
+   conflicts are never resolved by silently picking one side.
 
-   `muc/sops-config.yaml` with `path_regex: secrets/.*` → `^muc/secrets/.*`
+   <a id="user-visibility"></a>User (and therefore group) visibility is
+   scoped by directory ancestry, not global: a rule can only resolve a
+   `groups` entry to users declared at the root, or declared in the rule's
+   own directory or one of its ancestors. A user declared only in
+   `foo/bar/sops-config.yaml` is invisible to rules in `foo/`, in a sibling
+   `foo/baz/`, or at the root — so a subdirectory can never grant itself,
+   or anyone else outside its own subtree, access to a rule it doesn't
+   own. If a rule references a group that has no users visible from its
+   directory, that's the same "group has no matching users" error as
+   referencing a group that doesn't exist anywhere.
+3. **Path scoping** (`internal/merge.ScopePathRegex`): a root-level rule's
+   `path_regex` is used unmodified — SOPS matches it as an *unanchored
+   substring search* over the whole repo, same as vanilla `.sops.yaml`. A
+   subdirectory rule's `path_regex` gets the same substring-search
+   treatment, just scoped to its own directory: the fragment matches
+   whether it's directly inside that directory or nested arbitrarily
+   deeper, exactly as if the author had run that same fragment as a root
+   pattern against only their own subtree.
+
+   `muc/sops-config.yaml` with `path_regex: secrets/.*` →
+   `^muc/.*secrets/.*` (matches `muc/secrets/x` *and*
+   `muc/anything/secrets/x`)
+
+   Writing a leading `^` opts into anchoring the fragment to the top of the
+   directory instead, the same way `^` anchors a root pattern to the top of
+   the repo:
+
+   `muc/sops-config.yaml` with `path_regex: ^secrets/.*` →
+   `^muc/secrets/.*` (matches `muc/secrets/x` only, not
+   `muc/anything/secrets/x`)
 
    The directory component is escaped with `regexp.QuoteMeta` so directory
-   names containing regex metacharacters are matched literally. The
-   leading `^` matters: SOPS matches `path_regex` as an *unanchored
-   substring search*, so without it a directory named `muc` appearing
-   anywhere else in the tree could accidentally match a rule meant only for
-   `muc/`. No trailing `$` is added — the author decides whether a rule
-   covers one file or an entire subtree.
+   names containing regex metacharacters are matched literally, and the
+   composed pattern is always anchored at the start with `^dir/...`:
+   without that, a directory named e.g. `muc` appearing anywhere else in
+   the tree could accidentally match a rule meant only for `muc/`. No
+   trailing `$` is added — the author decides whether a rule covers one
+   file or an entire subtree. Any `path_regex` (root or subdirectory) that
+   doesn't start with `^` gets a warning, since it's easy to underestimate
+   how broadly an unanchored substring search can match.
 4. **Rule resolution** (`internal/merge.BuildRules`): for each rule, its
-   `groups` are resolved to the union of matching users, whose PGP/Age keys
-   are flattened, deduplicated, and alpha-sorted (for deterministic,
-   diff-friendly output). Rules are then stably sorted by `priority`
-   ascending — SOPS evaluates `creation_rules` top-to-bottom and uses the
-   first match, so a lower `priority` number means a rule is placed, and
-   therefore tried, earlier. Because the pre-sort order is already
-   root-then-subdirectory/in-file order, equal-priority rules keep a
-   deterministic tie-break automatically.
+   `groups` are resolved to the union of matching *visible* users (see
+   step 2), whose PGP/Age keys are flattened, deduplicated, and
+   alpha-sorted (for deterministic, diff-friendly output). Rules are then
+   stably sorted by `priority` ascending — SOPS evaluates `creation_rules`
+   top-to-bottom and uses the first match, so a lower `priority` number
+   means a rule is placed, and therefore tried, earlier. Because the
+   pre-sort order is already root-then-subdirectory/in-file order,
+   equal-priority rules keep a deterministic tie-break automatically.
 5. **Rendering** (`internal/sopsyaml.Render`): maps resolved rules to
    `creation_rules` entries (`pgp`/`age` as comma-joined strings) and
    prepends a fixed, timestamp-free "generated file, do not edit" header —
    so re-running `generate` over unchanged input produces byte-identical
-   output.
+   output. `generate` writes the result atomically (temp file + rename).
 
 ### Validation rules
 
@@ -157,19 +198,25 @@ pipeline, so they can never drift in what they check.
 | Malformed `path_regex` / `encrypted_regex` | error |
 | No `sops-config.yaml` at the root | error |
 | Duplicate user name with conflicting groups/keys | error |
-| Rule references a group with zero matching users | error |
+| Rule references a group with zero *visible* matching users | error |
 | Rule resolves to no PGP and no Age keys | error |
 | Duplicate `priority` across rules | warning |
+| `path_regex` doesn't start with `^` (unanchored substring search) | warning |
 | Zero rules resolved overall | error (both commands refuse unless `--force`) |
 
 These are all raised during the **merge** stage, after discovery has already
 succeeded, and are aggregated rather than fail-fast: a single run reports
 every one of these found across every file in one pass.
 
-Discovery-stage problems — malformed YAML, a missing required field, or no
-`sops-config.yaml` at the root — are different: they abort the run
-immediately, before merging starts, so only the first one found is
-reported. Fix it and rerun to uncover the next.
+Discovery-stage problems abort the run immediately, before merging starts,
+so only the first one found is reported — fix it and rerun to uncover the
+next. These include: malformed or unrecognized-field YAML; a missing
+required field (`name`, `path_regex`, `encrypted_regex`, `priority`); no
+`sops-config.yaml` at the root; an empty or duplicate group name; a user
+with no `pgp`/`age` keys at all; a rule with no `groups`; and a `pgp`/`age`
+key that doesn't look like a real key (an empty string, a duplicate within
+the same user, or a value that doesn't match the expected shape — an
+even-length hex string for `pgp`, an `age1...` recipient for `age`).
 
 ### Dependencies
 

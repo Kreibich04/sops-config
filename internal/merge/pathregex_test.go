@@ -10,10 +10,13 @@ func TestScopePathRegex(t *testing.T) {
 		want    string
 	}{
 		{"root passthrough", ".", ".*/muc/secrets/.*", ".*/muc/secrets/.*"},
-		{"subdir join and anchor", "muc", "secrets/.*", "^muc/secrets/.*"},
-		{"nested subdir", "muc/prod", "db/.*", "^muc/prod/db/.*"},
-		{"dir with regex metachars", "my.app", "secrets/.*", "^my\\.app/secrets/.*"},
-		{"leading slash trimmed", "muc", "/secrets/.*", "^muc/secrets/.*"},
+		{"subdir join, unanchored search within dir", "muc", "secrets/.*", "^muc/.*secrets/.*"},
+		{"subdir join, explicit anchor", "muc", "^secrets/.*", "^muc/secrets/.*"},
+		{"nested subdir, unanchored", "muc/prod", "db/.*", "^muc/prod/.*db/.*"},
+		{"nested subdir, anchored", "muc/prod", "^db/.*", "^muc/prod/db/.*"},
+		{"dir with regex metachars", "my.app", "secrets/.*", "^my\\.app/.*secrets/.*"},
+		{"leading slash trimmed, unanchored", "muc", "/secrets/.*", "^muc/.*secrets/.*"},
+		{"leading slash trimmed, anchored", "muc", "^/secrets/.*", "^muc/secrets/.*"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
