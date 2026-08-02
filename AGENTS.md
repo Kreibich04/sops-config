@@ -92,7 +92,10 @@ Full mechanics are in README.md's "Releasing" section. Key points if asked
 to cut a release:
 
 - Changelog fragments go in `changelog.d/` (towncrier), named
-  `+<slug>.<type>.md`; `release.sh` refuses to run with none present.
+  `+<slug>.<type>.md`; `release.sh` refuses to run with none present. Add
+  one as part of every change worth mentioning (feature, bugfix, doc,
+  removal, or misc per `towncrier.toml`) — not just at release time — so
+  it lands in the same PR as the change it describes.
 - `release.sh X.Y.Z` must run from `main` with a clean tree; it opens a
   release PR, it does not merge it.
 - Merging that PR bumps `VERSION`, which `tag-release.yml` picks up to tag

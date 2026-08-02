@@ -1,0 +1,1 @@
+Fixed `tag-release.yml` leaving a `GITHUB_TOKEN` credential override in local git config that silently overrode the `RELEASE_TOKEN`-authenticated tag push, which is why `release.yml` never fired automatically for the `v0.0.1`/`v0.0.2` tags.
