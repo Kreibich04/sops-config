@@ -1,0 +1,39 @@
+users:
+  - name: "Admin One"
+    groups:
+      - admin
+      - security-1
+    keys:
+      pgp:
+        - "AABB11"
+      age:
+        - "AABB11"
+  - name: "FRA Admin"
+    groups:
+      - fra1-admin
+      - security-fra1
+    keys:
+      pgp:
+        - "BBCC11"
+        - "CCBB11"
+rules:
+    - path_regex: .*/muc/secrets/.*
+      encrypted_regex: '^(data|stringData)$'
+      comment: "MUC secrets directory"
+      priority: 10
+      groups:
+        - admin
+    - path_regex: .*/muc/secure-secrets/.*
+      encrypted_regex: '^(data|stringData)$'
+      comment: "MUC secrets directory"
+      priority: 10
+      groups:
+        - security-1
+    - path_regex: .*/fra/secure-secrets/.*
+      encrypted_regex: '^(data|stringData)$'
+      comment: "FRA secrets directory"
+      priority: 10
+      groups:
+        - security-1
+        - fra1-admin
+
