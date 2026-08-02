@@ -50,8 +50,10 @@ go build -o sops-config ./cmd/sops-config
 
 Every discovery root needs exactly one `sops-config.yaml`. It defines
 `users` (each with group memberships and PGP/Age keys) and `rules` (each
-naming a `path_regex`, an `encrypted_regex`, a `priority`, and the `groups`
-allowed to decrypt matching files):
+naming a `path_regex`, a `priority`, and the `groups` allowed to decrypt
+matching files). `encrypted_regex` is optional — omit it to encrypt the
+entire file, which is the usual choice for a directory that holds nothing
+but secrets (e.g. a `secrets/` dir loaded via `secretGenerator`):
 
 ```yaml
 users:
@@ -231,7 +233,7 @@ every one of these found across every file in one pass.
 Discovery-stage problems abort the run immediately, before merging starts,
 so only the first one found is reported — fix it and rerun to uncover the
 next. These include: malformed or unrecognized-field YAML; a missing
-required field (`name`, `path_regex`, `encrypted_regex`, `priority`); no
+required field (`name`, `path_regex`, `priority`); no
 `sops-config.yaml` at the root; an empty or duplicate group name; a user
 with no `pgp`/`age` keys at all; a rule with no `groups`; and a `pgp`/`age`
 key that doesn't look like a real key (an empty string, a duplicate within

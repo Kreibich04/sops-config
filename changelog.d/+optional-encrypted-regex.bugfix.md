@@ -1,0 +1,1 @@
+`encrypted_regex` is now optional on a rule, matching vanilla SOPS: omitting it encrypts the entire file, instead of `generate`/`validate` failing with "encrypted_regex is required". This is the common case for a directory holding nothing but secrets (e.g. loaded whole via `secretGenerator`).

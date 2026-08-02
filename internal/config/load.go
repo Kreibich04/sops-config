@@ -48,9 +48,6 @@ func LoadFile(path string) (*Config, error) {
 		if r.PathRegex == "" {
 			return nil, fmt.Errorf("%s: rules[%d]: path_regex is required", path, i)
 		}
-		if r.EncryptedRegex == "" {
-			return nil, fmt.Errorf("%s: rules[%d]: encrypted_regex is required", path, i)
-		}
 		if r.Priority == nil {
 			return nil, fmt.Errorf("%s: rules[%d]: priority is required", path, i)
 		}
